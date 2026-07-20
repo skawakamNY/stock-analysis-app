@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  stock-analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock_analysis_app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./app/logs:/usr/src/app/app/logs
+      - ./app/documents:/usr/src/app/app/documents
+      - ./database:/usr/src/app/database
+    restart: unless-stopped

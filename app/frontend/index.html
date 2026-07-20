@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chroma Vector DB Explorer</title>
+    <link rel="stylesheet" href="index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Panel -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-icon"></div>
+                <h2>Chroma Explorer</h2>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>Ingest Filings</h3>
+                <div class="form-group">
+                    <label for="ticker-select">Ticker Symbol</label>
+                    <input type="text" id="ticker-select" value="NVDA" placeholder="e.g. AAPL, NVDA">
+                </div>
+                <button id="btn-ingest" class="btn-primary">
+                    <span class="btn-text">Ingest All Corporate Data</span>
+                    <span class="spinner" id="ingest-spinner" style="display: none;"></span>
+                </button>
+                <div id="ingest-status" class="status-msg"></div>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>Delete Ticker Data</h3>
+                <div class="form-group">
+                    <label for="delete-ticker-select">Select Ticker</label>
+                    <select id="delete-ticker-select" class="form-control" style="width: 100%; padding: 8px; border-radius: 6px; background-color: var(--bg-panel); border: 1px solid var(--border-color); color: var(--text-main);">
+                        <option value="">-- Choose Ticker --</option>
+                    </select>
+                </div>
+                <button id="btn-delete-ticker" class="btn-danger" style="width: 100%; padding: 10px; border-radius: 6px; border: none; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.2s ease; background-color: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.4); display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <span class="btn-text">Delete Ticker Vector Data</span>
+                    <span class="spinner" id="delete-spinner" style="display: none;"></span>
+                </button>
+                <div id="delete-status" class="status-msg"></div>
+            </div>
+            
+            <div class="sidebar-section registry-section">
+                <h3>Cached Registry</h3>
+                <div class="table-container">
+                    <table id="registry-table">
+                        <thead>
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Form</th>
+                                <th>Filing Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="3" class="empty-msg">No data ingested yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="main-header">
+                <div class="header-tabs">
+                    <button class="tab-btn active" data-tab="tab-search">Search & RAG Pipeline</button>
+                    <button class="tab-btn" data-tab="tab-evals">Evaluation Dashboard</button>
+                    <button class="tab-btn" id="btn-tab-inspect" data-tab="tab-inspect">Database Inspector</button>
+                </div>
+                <div class="db-badge">
+                    <span class="badge-dot"></span>
+                    <span id="db-status-text">Ephemeral In-Memory Chroma DB</span>
+                </div>
+            </header>
+            
+            <!-- Tab: Search & Pipeline -->
+            <section id="tab-search" class="tab-pane active">
+                <div class="search-bar-container">
+                    <div class="search-input-wrapper">
+                        <input type="text" id="query-input" placeholder="Ask a question about filings, e.g. What is Blackwell architecture demand drivers?">
+                        <button id="btn-search" class="btn-search">Search</button>
+                    </div>
+                    <div class="search-options">
+                        <div class="option-item">
+                            <label for="filter-ticker">Filter Ticker</label>
+                            <select id="filter-ticker">
+                                <option value="">No Filter</option>
+                                <option value="NVDA">NVDA</option>
+                                <option value="AAPL">AAPL</option>
+                            </select>
+                        </div>
+                        <div class="option-item">
+                            <label for="filter-form">Filter Form</label>
+                            <select id="filter-form">
+                                <option value="">No Filter</option>
+                                <option value="10-K">10-K</option>
+                                <option value="10-Q">10-Q</option>
+                                <option value="8-K">8-K</option>
+                                <option value="Earnings">Earnings Transcript</option>
+                            </select>
+                        </div>
+                        <div class="option-item slider-item">
+                            <label for="top-k-slider">Candidates: <span id="top-k-val">5</span></label>
+                            <input type="range" id="top-k-slider" min="1" max="15" value="5">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Visual Pipeline Layout -->
+                <div class="pipeline-flow">
+                    <div class="flow-step">
+                        <div class="step-num">1</div>
+                        <div class="step-label">Metadata Filter</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">2</div>
+                        <div class="step-label">Hybrid (Vector/BM25)</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">3</div>
+                        <div class="step-label">RRF Ranker</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">4</div>
+                        <div class="step-label">Cross Encoder</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step">
+                        <div class="step-num">5</div>
+                        <div class="step-label">Deduplicate</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-step highlight">
+                        <div class="step-num">6</div>
+                        <div class="step-label">Parent Retrieval</div>
+                    </div>
+                </div>
+                
+                <!-- Results Grid -->
+                <div class="results-layout">
+                    <div class="results-header">
+                        <h3>Retrieved Candidates</h3>
+                        <span id="results-count" class="results-count">0 chunks found</span>
+                    </div>
+                    <div id="results-grid" class="results-grid">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🔍</div>
+                            <p>Enter a query above to execute the RAG search pipeline</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Tab: Evaluations -->
+            <section id="tab-evals" class="tab-pane">
+                <div class="eval-control-panel">
+                    <div class="eval-desc">
+                        <h3>Mean Reciprocal Rank (MRR@5) Evaluation</h3>
+                        <p>Evaluates retrieval relevance across pre-defined queries for selected document types, comparing matches inside the hybrid search index.</p>
+                    </div>
+                    <div class="eval-actions">
+                        <select id="eval-form-select">
+                            <option value="10-K">Form 10-K</option>
+                            <option value="10-Q">Form 10-Q</option>
+                            <option value="8-K">Form 8-K</option>
+                            <option value="Earnings">Earnings Transcripts</option>
+                        </select>
+                        <button id="btn-run-eval" class="btn-primary">
+                            <span class="btn-text">Run Evaluation Suite</span>
+                            <span class="spinner" id="eval-spinner" style="display: none;"></span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="eval-results-container">
+                    <div class="eval-mrr-card">
+                        <h4>MRR Score</h4>
+                        <div id="mrr-val-display" class="mrr-value">0.0000</div>
+                        <div class="progress-bar-bg">
+                            <div id="mrr-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="eval-details-card">
+                        <h4>Query Execution Detail</h4>
+                        <div class="table-container">
+                            <table id="eval-details-table">
+                                <thead>
+                                    <tr>
+                                        <th>Query</th>
+                                        <th>Expected Target Section</th>
+                                        <th>Matched Rank</th>
+                                        <th>Score Contribution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="4" class="empty-msg">No evaluation run has completed</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: Database Inspector -->
+            <section id="tab-inspect" class="tab-pane">
+                <div class="eval-control-panel">
+                    <div class="eval-desc">
+                        <h3>Database Inspector</h3>
+                        <p>View all stored chunks, vector documents, and metadata inside the active database collection.</p>
+                    </div>
+                    <div class="eval-actions">
+                        <button id="btn-refresh-inspect" class="btn-primary">
+                            <span>Refresh Collection Contents</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="search-options" style="background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem; display: flex; gap: 2rem; align-items: center;">
+                    <div class="option-item">
+                        <label for="inspect-filter-ticker">Filter Ticker</label>
+                        <select id="inspect-filter-ticker">
+                            <option value="">All Tickers</option>
+                        </select>
+                    </div>
+                    <div class="option-item">
+                        <label for="inspect-filter-form">Filter Form</label>
+                        <select id="inspect-filter-form" disabled>
+                            <option value="">All Forms</option>
+                        </select>
+                    </div>
+                    <div class="option-item">
+                        <label for="inspect-filter-item">Filter Section / Item</label>
+                        <select id="inspect-filter-item" disabled>
+                            <option value="">All Sections</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table id="inspect-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 140px;">ID</th>
+                                <th style="width: 80px;">Ticker</th>
+                                <th style="width: 80px;">Form</th>
+                                <th style="width: 150px;">Section / Item</th>
+                                <th>Document Chunk Content</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="5" class="empty-msg">Click Refresh to inspect collection contents</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div class="pagination-container" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 0 0.5rem;">
+                    <div id="pagination-info" style="font-size: 0.8rem; color: var(--text-muted);">
+                        Showing 0-0 of 0 entries
+                    </div>
+                    <div class="pagination-buttons" style="display: flex; gap: 0.5rem;">
+                        <button id="btn-page-prev" class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" disabled>Previous</button>
+                        <button id="btn-page-next" class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" disabled>Next</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- Modal for Parent Retrieval View -->
+    <div id="parent-modal" class="modal">
+        <div class="modal-content glass">
+            <span class="close-modal">&times;</span>
+            <div class="modal-header-meta">
+                <span id="modal-meta-ticker" class="modal-badge badge-ticker">AAPL</span>
+                <span id="modal-meta-form" class="modal-badge badge-form">10-K</span>
+                <span id="modal-meta-item" class="modal-badge badge-item">Item 1A</span>
+            </div>
+            <h3 id="modal-title">Parent Document Context</h3>
+            <div class="modal-body-container">
+                <div class="modal-split">
+                    <div class="modal-pane-chunk">
+                        <h4>Retrieved Embedded Chunk</h4>
+                        <div class="chunk-metadata-box" style="margin-bottom: 0.75rem; font-size: 0.75rem; background-color: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.5rem 0.75rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; color: var(--text-secondary);">
+                            <div><strong>Ticker:</strong> <span id="modal-chunk-ticker">N/A</span></div>
+                            <div><strong>Form Type:</strong> <span id="modal-chunk-form">N/A</span></div>
+                            <div><strong>Section:</strong> <span id="modal-chunk-section">N/A</span></div>
+                            <div><strong>Filing Date:</strong> <span id="modal-chunk-date">N/A</span></div>
+                            <div><strong>Char Count:</strong> <span id="modal-chunk-chars">N/A</span></div>
+                            <div><strong>Word Count:</strong> <span id="modal-chunk-words">N/A</span></div>
+                            <div style="grid-column: span 2; word-break: break-all;"><strong>Source URL:</strong> <a id="modal-chunk-url" href="#" target="_blank" style="color: var(--primary); text-decoration: underline;">N/A</a></div>
+                        </div>
+                        <div id="modal-chunk-text" class="code-font text-highlight">...</div>
+                    </div>
+                    <div class="modal-pane-parent">
+                        <h4>Resolved Parent Document Plaintext</h4>
+                        <div id="modal-parent-text" class="code-font scrollable-text">...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="index.js"></script>
+</body>
+</html>

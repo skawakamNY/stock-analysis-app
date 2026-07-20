@@ -1,0 +1,140 @@
+# =============================================================================
+# Environment Variables
+# =============================================================================
+.env
+.env.*
+*.env
+# Keep sample/template files
+!.env.sample
+!.env.example
+
+# =============================================================================
+# Python
+# =============================================================================
+# Virtual environments
+.venv
+.venv*/
+venv/
+env/
+ENV/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+nosetests.xml
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+.pytype/
+.pyre/
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# uv
+.python-version
+
+# =============================================================================
+# Node.js / Frontend (Vite)
+# =============================================================================
+node_modules/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+frontend/dist-ssr/
+
+# Vite / Rollup cache
+.vite/
+frontend/.vite/
+
+# npm / yarn / pnpm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =============================================================================
+# Application-Generated Files
+# =============================================================================
+# Log files
+*.log
+logs/
+app/logs/
+
+# Database files (generated at runtime)
+app/database/chroma.sqlite3
+app/database/chroma_db/
+app/database/*.db
+app/database/hybrid_index_meta.json
+app/database/56e7f799-*/
+
+# Generated/cached documents (uploaded at runtime)
+app/documents/
+
+# Transcript cache files (runtime-generated)
+transcripts_cache_*.json
+
+# Vector DB registry (runtime-generated)
+vector_db_registry.json
+
+# Test registry (runtime-generated)
+test_registry.json
+
+# =============================================================================
+# OS & Editor Artifacts
+# =============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor: VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# Editor: JetBrains / PyCharm
+.idea/
+*.iml
+
+# Editor: Vim/Emacs swap files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# =============================================================================
+# Docker
+# =============================================================================
+# Ignore local override files but keep base compose
+docker-compose.override.yml
