@@ -42,6 +42,36 @@ from database.db_helper import initiate_workflow_record, update_agent_report, in
 setup_logging()
 logger = logging.getLogger("StockAnalysisServer")
 
+def start_background_mcp_server():
+    import subprocess
+    import sys
+    import socket
+    
+    # Try a quick socket connection check to see if port 8010 is active
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(0.5)
+    try:
+        s.connect(("127.0.0.1", 8010))
+        s.close()
+        logger.info("Standalone Document Search MCP server is already running on port 8010.")
+    except Exception:
+        logger.info("Starting standalone Document Search MCP server on port 8010 in the background...")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        mcp_script = os.path.join(current_dir, "mcp_server", "document_search.py")
+        
+        env = os.environ.copy()
+        env["PYTHONPATH"] = current_dir # include app/ in PYTHONPATH
+        
+        subprocess.Popen(
+            [sys.executable, mcp_script],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        logger.info("Background Document Search MCP server subprocess spawned successfully.")
+
+start_background_mcp_server()
+
 import urllib.request
 import re
 import gzip

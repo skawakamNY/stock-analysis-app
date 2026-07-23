@@ -10,6 +10,25 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - DOCUMENT_SEARCH_MCP_URL=http://document-search-mcp:8010/sse
+    volumes:
+      - ./app/logs:/usr/src/app/app/logs
+      - ./app/documents:/usr/src/app/app/documents
+      - ./database:/usr/src/app/database
+    depends_on:
+      - document-search-mcp
+    restart: unless-stopped
+
+  document-search-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: document_search_mcp
+    ports:
+      - "8010:8010"
+    env_file:
+      - .env
     volumes:
       - ./app/logs:/usr/src/app/app/logs
       - ./app/documents:/usr/src/app/app/documents

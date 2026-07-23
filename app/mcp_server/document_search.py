@@ -1454,4 +1454,4 @@ async def doc_rag_search(query: str, ticker: str, form_type: str) -> str:
     return state.get("final_answer", "")
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="sse", host="127.0.0.1", port=8010)

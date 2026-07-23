@@ -1,0 +1,22 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+
+WORKDIR /usr/src/app
+
+# Copy dependency files and install
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project
+
+# Copy application files
+COPY app/ ./app/
+
+# Create necessary directories for runtime
+RUN mkdir -p app/logs app/documents database
+
+# Expose MCP server port
+EXPOSE 8010
+
+# Set PYTHONPATH to include the app directory
+ENV PYTHONPATH=app
+
+# Run the standalone MCP server
+CMD ["uv", "run", "python", "app/mcp_server/document_search.py"]

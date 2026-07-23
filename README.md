@@ -97,7 +97,19 @@ After all four specialist components complete, their outputs are passed sequenti
 |-----------|--------|------------------|--------|
 | **Valuation** | All four specialist reports | Builds a discounted cash flow model using assumptions derived from the specialist reports. Projects revenue, margins, and free cash flow across bull, base, and bear scenarios. Computes intrinsic value per share and compares it to the current market price to determine the margin of safety or premium. | DCF-based valuation report with scenario analysis |
 | **Summary** | All five reports above | Synthesises all findings into a unified investment thesis. Distils the most important strengths, concerns, and uncertainties. Produces a quantitative conviction score (0–100) reflecting overall quality and risk-adjusted attractiveness. | Investment thesis summary with conviction score |
-| **Committee** | All six reports above | Acts as the final investment board. Reviews the full body of evidence and issues a binding recommendation — **Approve**, **Watchlist**, or **Reject** — with a written rationale, risk-reward assessment, news and valuation commentary, and explicit conditions required to revisit the decision. | Final investment committee decision |
+### Standalone Document Search MCP Server
+
+The **Document Searcher Agent** is decoupled from the main FastAPI server and operates as an independent Model Context Protocol (MCP) service:
+- **Protocol & Transport:** Communicates using the standard Model Context Protocol via Server-Sent Events (SSE) HTTP transport. By default, the server binds to port `8010` (to prevent conflicts with the web application workspace running on `8000`).
+- **Decoupled Architecture:** Separating the document ingestion and hybrid RAG search pipelines from the LangGraph agent runner enables independent scaling, sandboxing, and remote hosting of the vector storage infrastructure.
+- **Automatic Lifecycle Management:** While the server can be run manually using `run_mcp_server.ps1` or `run_mcp_server.bat`, the FastAPI server automatically checks if port `8010` is active on startup and spawns the MCP server as a background subprocess if it is missing.
+- **Configurable Routing:** The agent client wrapper queries the MCP server via the `DOCUMENT_SEARCH_MCP_URL` environment variable (defaulting to `http://127.0.0.1:8010/sse`), allowing seamless configuration for local, Docker Compose, or remote Kubernetes service routing.
+
+**Core Responsibilities & Capabilities:**
+- **Dynamic Data Ingestion:** Resolves corporate CIK identifiers via SEC EDGAR, downloads 10-K, 10-Q, and 8-K filings directly, and retrieves/caches earnings call transcripts from `filingapi.dev`. Ingested data is parsed, chunked, and stored in a local Chroma vector database.
+- **Hybrid Search Engine:** Performs concurrent lexical (BM25) and semantic retrieval across the ingested documents, combining scores using Reciprocal Rank Fusion (RRF).
+- **Passage Reranking:** Applies a Cross-Encoder reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to prioritize the top 5 most relevant information blocks.
+- **Context Synthesis & Parent Retrieval:** For matched passages, it retrieves the full parent document section (up to 30,000 characters) to preserve context, then passes it through a Multi-Agent Supervisor workflow (featuring Retrieval and Financial Analyst sub-agents) to return synthesized, factual answers.
 
 ---
 
@@ -412,8 +424,8 @@ Tools are registered per-agent in `agents.yaml` and instantiated in [`builder.py
 Signature: doc_rag_search(query: str, ticker: str, form_type: str) -> str
 ```
 
-This is the primary knowledge-retrieval mechanism. When called by an agent, the function acts as an MCP client and delegates to the **Document Searcher Agent** MCP service (`app/mcp_server/document_search.py`) using the Model Context Protocol stdio transport:
-1. Spawns the MCP server subprocess inside the local virtual environment.
+This is the primary knowledge-retrieval mechanism. When called by an agent, the function acts as an MCP client and delegates to the **Document Searcher Agent** MCP service (`app/mcp_server/document_search.py`) using the Model Context Protocol HTTP SSE transport:
+1. Connects to the standalone MCP server at `http://127.0.0.1:8010/sse` (the port/endpoint can be customized via the `DOCUMENT_SEARCH_MCP_URL` environment variable).
 2. Calls the `doc_rag_search` tool exposed by the MCP server.
 3. The MCP server triggers `async_ingest_all_corporate_data()` (idempotent via registry check).
 4. The MCP server instantiates a `MultiAgentSupervisor` over the `HybridSearcher` and `CrossEncoderReranker` to run the full hybrid retrieval pipeline and returns the synthesized answer.
@@ -586,23 +598,44 @@ A developer and power-user tool for inspecting, querying, and managing the Chrom
     FILING_API_KEY=your_filingapi_dev_key
     ```
     `FILING_API_KEY` is required to fetch earnings call transcripts from [filingapi.dev](https://filingapi.dev). Without it, the transcript ingestion step is skipped and earnings data will be unavailable to agents.
-5.  **Run Application**:
+5.  **Run Standalone MCP Server** (Optional/Manual):
+    If you wish to run the Document Search MCP Server independently, you can start it using one of the helper scripts in the root directory:
+    - On Windows (PowerShell):
+      ```powershell
+      ./run_mcp_server.ps1
+      ```
+    - On Windows (Command Prompt):
+      ```cmd
+      run_mcp_server.bat
+      ```
+    - Or directly via Python:
+      ```bash
+      PYTHONPATH=app python app/mcp_server/document_search.py
+      ```
+    This starts the standalone server on `http://127.0.0.1:8010/sse`.
+
+6.  **Run Main Application**:
     Start the FastAPI application:
     ```bash
     uv run python app/server.py
     ```
-    Access the application at `http://localhost:8000`.
+    *Note: The FastAPI server automatically checks if the standalone MCP server is running on port 8010, and if not, automatically launches it in the background for you.*
 
-### Running in Docker
+    Access the application workspace at `http://localhost:8000`.
 
-To deploy the entire environment inside containerized environments:
+To deploy the entire multi-service environment inside containerized environments:
 
 1.  **Build and Run Compose**:
     ```bash
     docker compose up --build -d
     ```
+    This spins up two containerized services:
+    - `stock-analysis`: The main web application workspace running on port `8000`.
+    - `document-search-mcp`: The standalone Document Search MCP server running on port `8010` (used for document RAG retrieval).
+
 2.  **Access Points**:
-    *   Main Workspace: `http://localhost:8000`
-    *   Database Explorer: `http://localhost:8000/database`
-    *   Chroma Explorer: `http://localhost:8000/chroma`
+    - Main Workspace: `http://localhost:8000`
+    - Standalone MCP Server: `http://localhost:8010/sse`
+    - Database Explorer: `http://localhost:8000/database`
+    - Chroma Explorer: `http://localhost:8000/chroma`
 

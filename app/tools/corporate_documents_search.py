@@ -20,36 +20,20 @@ if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 
 # Setup logging
-logger = logging.getLogger("StockResearchAgent")
+logger = logging.getLogger("DocumentSearchAgent")
 
 
 
 
 
 async def _async_doc_rag_search_mcp(query: str, ticker: str, form_type: str) -> str:
-    import sys
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
     
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
+    server_url = os.environ.get("DOCUMENT_SEARCH_MCP_URL", "http://127.0.0.1:8010/sse")
+    logger.info(f"Connecting to document search MCP service via HTTP SSE at: {server_url}")
     
-    # Resolve the virtual environment's python executable
-    venv_python = os.path.join(project_root, ".venv", "Scripts", "python.exe")
-    if not os.path.exists(venv_python):
-        venv_python = os.path.join(project_root, ".venv", "bin", "python")
-        
-    python_exe = venv_python if os.path.exists(venv_python) else sys.executable
-    
-    mcp_server_path = os.path.abspath(os.path.join(current_dir, "..", "mcp_server", "document_search.py"))
-    
-    server_params = StdioServerParameters(
-        command=python_exe,
-        args=[mcp_server_path],
-        env=os.environ.copy()
-    )
-    
-    async with stdio_client(server_params) as (read, write):
+    async with sse_client(url=server_url, timeout=600.0) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(
@@ -64,6 +48,8 @@ async def _async_doc_rag_search_mcp(query: str, ticker: str, form_type: str) -> 
             for content in result.content:
                 if hasattr(content, "text"):
                     ans += content.text
+                elif isinstance(content, dict) and "text" in content:
+                    ans += content["text"]
             return ans
 
 
