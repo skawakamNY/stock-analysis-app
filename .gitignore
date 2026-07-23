@@ -139,4 +139,4 @@ $RECYCLE.BIN/
 # Ignore local override files but keep base compose
 docker-compose.override.yml
 
-app/mcp_server/database/*
+app/mcp_server/database/
