@@ -164,7 +164,7 @@ def check_bypass_agents(ticker: str) -> tuple[bool, dict]:
     else:
         prev_dt = prev_date
         
-    from tools.corporate_documents_search import IngestionRegistry
+    from mcp_server import IngestionRegistry
     try:
         registry = IngestionRegistry().load_registry()
         ticker_upper = ticker.upper().strip()

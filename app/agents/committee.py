@@ -130,6 +130,68 @@ Do not predict stock prices.
         prompt
     )
 
+    committee_decision = response.text
+
+    # Accumulate all agent reports to write a complete markdown consensus report
+    import os
+    import datetime
+    from tools.pdf_generator_tool import generate_pdf_report_tool
+
+    ticker = state.get("ticker", "UNKNOWN")
+    company_name = state.get("company_name", "UNKNOWN")
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    markdown_content = f"""# Consensus Investment Report: {company_name} ({ticker})
+**Generated on**: {date_str}
+
+## Executive Investment Committee Decision
+{committee_decision}
+
+## Investment Thesis & Summary
+{state.get("investment_summary", "N/A")}
+
+## Business & Operations Research
+{state.get("research_report", "N/A")}
+
+## Financial Statement Analysis
+{state.get("financial_report", "N/A")}
+
+## Investment Risk Assessment
+{state.get("risk_report", "N/A")}
+
+## Latest News & Public Sentiment Analysis
+{state.get("latest_news_report", "N/A")}
+
+## Valuation & Margin of Safety Analysis
+{state.get("valuation_report", "N/A")}
+"""
+
+    # Resolve markdown directory (app/markdown/)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    app_dir = os.path.dirname(current_dir)
+    markdown_dir = os.path.join(app_dir, "markdown")
+    os.makedirs(markdown_dir, exist_ok=True)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    md_filename = f"{ticker}_{timestamp}.md"
+    md_filepath = os.path.join(markdown_dir, md_filename)
+
+    try:
+        with open(md_filepath, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+        logger.info(f"Consensus report successfully saved to Markdown: {md_filepath}")
+    except Exception as md_err:
+        logger.error(f"Failed to generate Markdown report: {md_err}")
+
+    # Generate the PDF file using the new tool
+    full_state = dict(state)
+    full_state["committee_decision"] = committee_decision
+    try:
+        pdf_path = generate_pdf_report_tool(ticker, company_name, full_state)
+        logger.info(f"Consensus report successfully saved to PDF via tool: {pdf_path}")
+    except Exception as pdf_err:
+        logger.error(f"Failed to generate PDF report via tool: {pdf_err}")
+
     return {
-        "committee_decision": response.text
+        "committee_decision": committee_decision
     }

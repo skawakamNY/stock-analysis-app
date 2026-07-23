@@ -14,12 +14,12 @@ tools_dir = os.path.join(app_dir, "tools")
 if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
 
-from corporate_documents_search import (
+from mcp_server import (
     HybridSearcher,
     CrossEncoderReranker,
     IngestionRegistry,
-    ingest_all_corporate_data,
-    RetrievalEvaluator
+    RetrievalEvaluator,
+    ingest_all_corporate_data
 )
 
 # Configure logging

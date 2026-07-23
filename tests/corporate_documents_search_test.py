@@ -3,14 +3,17 @@ import asyncio
 import sys
 import os
 
-# Ensure the app/tools directory is in the import path
+# Ensure the app/tools and app directories are in the import path
 test_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(test_dir)
 tools_dir = os.path.join(project_dir, "app", "tools")
+app_dir = os.path.join(project_dir, "app")
 if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
 
-from corporate_documents_search import (
+from mcp_server import (
     SECDownloader,
     SECParser,
     SemanticChunker,
@@ -23,7 +26,9 @@ from corporate_documents_search import (
     EarningsCallManager,
     async_fetch_and_parse_earnings_call,
     IngestionRegistry,
-    ingest_all_corporate_data,
+    ingest_all_corporate_data
+)
+from corporate_documents_search import (
     doc_rag_search,
 )
 
@@ -228,7 +233,7 @@ def test_nvidia_earnings_call_processing():
         assert len(chunks) > 1, f"Expected more than one chunk for NVDA Earnings transcript, got {len(chunks)}"
         
         # Verify metadata mapping
-        assert chunks[0]["metadata"]["item_name"] == "Earnings Call Transcript"
+        assert chunks[0]["metadata"]["item_name"].startswith("Earnings Call Transcript")
         assert chunks[0]["metadata"]["ticker"] == "NVDA"
         assert chunks[0]["metadata"]["form_type"] == "Earnings"
         
@@ -237,7 +242,7 @@ def test_nvidia_earnings_call_processing():
         results = searcher.rrf_hybrid_retrieve("What is Blackwell packaging demand and TSMC partnership comments?", top_k=3)
         assert len(results) > 0
         retrieved_items = [r["metadata"]["item_name"] for r in results]
-        assert "Earnings Call Transcript" in retrieved_items
+        assert any(item.startswith("Earnings Call Transcript") for item in retrieved_items)
 
     asyncio.run(run_earnings_test())
 

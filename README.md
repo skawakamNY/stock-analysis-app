@@ -49,6 +49,18 @@ graph TD
     ParallelBranch --> FinancialAgent[Financial Agent]
     ParallelBranch --> RiskAgent[Risk Agent]
     ParallelBranch --> NewsAgent[News Agent]
+
+    subgraph MCP Server Infrastructure
+        MCPServer[Document Searcher MCP Server<br>document_search.py]
+        VectorDB[(Hybrid Vector DB<br>Chroma + SQLite)]
+        SECApi[SEC EDGAR / filingapi.dev]
+    end
+
+    ResearchAgent -.->|doc_rag_search| MCPServer
+    FinancialAgent -.->|doc_rag_search| MCPServer
+    RiskAgent -.->|doc_rag_search| MCPServer
+    MCPServer <--> VectorDB
+    MCPServer <--> SECApi
     
     ResearchAgent --> ValuationNode[Valuation Agent]
     FinancialAgent --> ValuationNode
@@ -72,9 +84,9 @@ The four specialist components execute concurrently and independently. Each rece
 
 | Component | Inputs | Responsibilities | Output |
 |-----------|--------|------------------|--------|
-| **Research** | Ticker, company metadata | Retrieves 10-K, 10-Q, 8-K filings and earnings call transcripts from the document store. Analyses the company's business model, products, revenue mix, customer segments, industry dynamics, TAM, competitive moat, management strategy, and growth drivers. | Qualitative business & competitive research report |
-| **Financial** | Ticker, company metadata | Retrieves financial statement sections from SEC filings. Analyses multi-year revenue growth, gross and operating margins, net income, ROIC, capital structure, debt obligations, and free cash flow trends. | Financial performance & health report |
-| **Risk** | Ticker, company metadata | Retrieves risk factor disclosures from SEC filings. Identifies and categorises material risks across company-specific, operational, legal, macroeconomic, and regulatory dimensions. Assigns severity to each risk. | Ranked risk exposure report |
+| **Research** | Ticker, company metadata | Delegates to the **Document Searcher MCP Server** (`doc_rag_search`) to retrieve 10-K, 10-Q, 8-K filings and earnings call transcripts from the vector/hybrid store. Analyses the company's business model, products, revenue mix, customer segments, industry dynamics, TAM, competitive moat, management strategy, and growth drivers. | Qualitative business & competitive research report |
+| **Financial** | Ticker, company metadata | Delegates to the **Document Searcher MCP Server** (`doc_rag_search`) to retrieve financial statement sections from SEC filings. Analyses multi-year revenue growth, gross and operating margins, net income, ROIC, capital structure, debt obligations, and free cash flow trends. | Financial performance & health report |
+| **Risk** | Ticker, company metadata | Delegates to the **Document Searcher MCP Server** (`doc_rag_search`) to retrieve risk factor disclosures from SEC filings. Identifies and categorises material risks across company-specific, operational, legal, macroeconomic, and regulatory dimensions. Assigns severity to each risk. | Ranked risk exposure report |
 | **News** | Ticker, company metadata | Searches the web for news, analyst commentary, press releases, and market sentiment from the past 30 days. Summarises recent developments, earnings reactions, and narrative shifts that may affect the investment case. | Real-time news & sentiment report |
 
 #### Sequential Stage — Synthesis & Decision
@@ -95,7 +107,7 @@ This section details how raw SEC source documents and earnings call transcripts 
 
 ### 4.1 Overview
 
-The ingestion pipeline is implemented in [`corporate_documents_search.py`](app/tools/corporate_documents_search.py). It is triggered automatically the first time a ticker is queried (via `doc_rag_search`) and subsequently only when new filings are detected. All form-type stages run in parallel using `asyncio.gather`.
+The ingestion pipeline is implemented in [`document_search.py`](app/mcp_server/document_search.py) (as part of the Document Searcher Agent MCP service). It is triggered automatically the first time a ticker is queried (via `doc_rag_search` client wrapper in `corporate_documents_search.py`) and subsequently only when new filings are detected. All form-type stages run in parallel using `asyncio.gather`.
 
 ```mermaid
 flowchart TD
@@ -165,7 +177,7 @@ All count parameters are configured centrally in [`app/config.py`](app/config.py
 
 #### Stage 4a — Earnings Call Transcript Source (filingapi.dev)
 
-Earnings call transcripts are fetched from **[filingapi.dev](https://filingapi.dev)** via its REST transcript endpoint. The HTTP call is isolated in the standalone function `fetch_transcripts_from_filingapi()` in [`app/tools/corporate_documents_search.py`](app/tools/corporate_documents_search.py).
+Earnings call transcripts are fetched from **[filingapi.dev](https://filingapi.dev)** via its REST transcript endpoint. The HTTP call is isolated in the standalone function `fetch_transcripts_from_filingapi()` in [`app/mcp_server/document_search.py`](app/mcp_server/document_search.py).
 
 **Endpoint URL**:
 ```
@@ -391,19 +403,20 @@ Each node function instantiates a **Google ADK `RunnableLlmAgent`** (defined in 
 
 Tools are registered per-agent in `agents.yaml` and instantiated in [`builder.py`](app/agents/builder.py) via `create_tool_list()`. The two shared tools are:
 
-#### `doc_rag_search` — Corporate Documents RAG Tool
+#### `doc_rag_search` — Corporate Documents RAG Tool (MCP Service)
 
-**File**: [`app/tools/corporate_documents_search.py`](app/tools/corporate_documents_search.py)  
+**File**: [`app/tools/corporate_documents_search.py`](app/tools/corporate_documents_search.py) (Client) & [`app/mcp_server/document_search.py`](app/mcp_server/document_search.py) (MCP Server Service)  
 **Used by**: Research, Financial, Risk agents
 
 ```
 Signature: doc_rag_search(query: str, ticker: str, form_type: str) -> str
 ```
 
-This is the primary knowledge-retrieval mechanism. When called by an agent:
-1. Triggers `async_ingest_all_corporate_data()` if the ticker has not been ingested yet (idempotent via registry check).
-2. Instantiates a `MultiAgentSupervisor` over the `HybridSearcher` and `CrossEncoderReranker`.
-3. Runs the full hybrid retrieval pipeline (vector search → BM25 → RRF → reranking → parent expansion) and returns a formatted context string.
+This is the primary knowledge-retrieval mechanism. When called by an agent, the function acts as an MCP client and delegates to the **Document Searcher Agent** MCP service (`app/mcp_server/document_search.py`) using the Model Context Protocol stdio transport:
+1. Spawns the MCP server subprocess inside the local virtual environment.
+2. Calls the `doc_rag_search` tool exposed by the MCP server.
+3. The MCP server triggers `async_ingest_all_corporate_data()` (idempotent via registry check).
+4. The MCP server instantiates a `MultiAgentSupervisor` over the `HybridSearcher` and `CrossEncoderReranker` to run the full hybrid retrieval pipeline and returns the synthesized answer.
 
 Supported `form_type` values:
 

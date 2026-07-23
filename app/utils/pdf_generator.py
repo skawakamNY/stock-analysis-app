@@ -1,6 +1,53 @@
 import os
 import datetime
+import re
 from fpdf import FPDF
+
+def render_pdf_table(pdf, table_rows):
+    # Filter out separator rows
+    valid_rows = []
+    for row in table_rows:
+        cells = [c.strip() for c in row.split("|")[1:-1]]
+        if all(re.match(r"^:?\-+:?$", cell) for cell in cells if cell):
+            continue
+        valid_rows.append(cells)
+        
+    if not valid_rows:
+        return
+        
+    num_cols = max(len(row) for row in valid_rows)
+    if num_cols == 0:
+        return
+        
+    page_width = 180
+    if num_cols > 1:
+        first_col_width = 75
+        other_col_width = (page_width - first_col_width) / (num_cols - 1)
+        col_widths = [first_col_width] + [other_col_width] * (num_cols - 1)
+    else:
+        col_widths = [page_width]
+        
+    pdf.ln(2)
+    for row_idx, cells in enumerate(valid_rows):
+        is_header = (row_idx == 0)
+        if is_header:
+            pdf.set_font("helvetica", "B", 8)
+            pdf.set_fill_color(240, 240, 240)
+            pdf.set_text_color(10, 25, 47)
+        else:
+            pdf.set_font("helvetica", "", 8)
+            pdf.set_fill_color(255, 255, 255)
+            pdf.set_text_color(50, 50, 50)
+            
+        for col_idx in range(num_cols):
+            val = cells[col_idx] if col_idx < len(cells) else ""
+            w = col_widths[col_idx]
+            align = "L" if col_idx == 0 else "R"
+            clean_val = val.encode("latin-1", "replace").decode("latin-1")
+            # Border 1 is full box, fill True uses background color
+            pdf.cell(w, 7, clean_val, border=1, ln=(1 if col_idx == num_cols - 1 else 0), align=align, fill=True)
+            
+    pdf.ln(4)
 
 class PDFReport(FPDF):
     def header(self):
@@ -105,7 +152,91 @@ def save_reports_to_pdf(ticker: str, company_name: str, state: dict) -> str:
         # (fpdf default fonts use latin-1 encoding map)
         encoded_content = cleaned_content.encode("latin-1", "replace").decode("latin-1")
         
-        pdf.multi_cell(0, 5, encoded_content)
+        # Split into lines and render each line by parsing simple markdown headings, bold text, & tables
+        lines = encoded_content.split("\n")
+        sanitized_lines = []
+        import re
+        for line in lines:
+            if " "*100 in line:
+                line = re.sub(r" {2,}", " ", line)
+            sanitized_lines.append(line)
+        lines = sanitized_lines
+
+        in_table = False
+        table_rows = []
+        
+        for line in lines:
+            strip_line = line.strip()
+            if strip_line.startswith("|") and strip_line.endswith("|"):
+                if not in_table:
+                    in_table = True
+                    table_rows = []
+                table_rows.append(strip_line)
+                continue
+                
+            # If we were in a table and hit a non-table line, render the table
+            if in_table:
+                render_pdf_table(pdf, table_rows)
+                in_table = False
+                table_rows = []
+                
+            if not strip_line:
+                pdf.ln(4)
+                continue
+                
+            # Handle Headings
+            if strip_line.startswith("####"):
+                text = strip_line.replace("####", "").replace("**", "").strip()
+                pdf.set_font("helvetica", "B", 11)
+                pdf.set_text_color(10, 25, 47)
+                pdf.write(6, text)
+                pdf.ln(8)
+                pdf.set_text_color(50, 50, 50)
+            elif strip_line.startswith("###"):
+                text = strip_line.replace("###", "").replace("**", "").strip()
+                pdf.set_font("helvetica", "B", 12)
+                pdf.set_text_color(10, 25, 47)
+                pdf.write(7, text)
+                pdf.ln(9)
+                pdf.set_text_color(50, 50, 50)
+            elif strip_line.startswith("##"):
+                text = strip_line.replace("##", "").replace("**", "").strip()
+                pdf.set_font("helvetica", "B", 13)
+                pdf.set_text_color(10, 25, 47)
+                pdf.write(8, text)
+                pdf.ln(10)
+                pdf.set_text_color(50, 50, 50)
+            elif strip_line.startswith("#"):
+                text = strip_line.replace("#", "").replace("**", "").strip()
+                pdf.set_font("helvetica", "B", 14)
+                pdf.set_text_color(10, 25, 47)
+                pdf.write(9, text)
+                pdf.ln(11)
+                pdf.set_text_color(50, 50, 50)
+            else:
+                # Check for bullet points and replace them with a proper bullet character
+                import re
+                line_str = line.rstrip()
+                bullet_match = re.match(r"^(\s*)([\*\-])(\s+)", line_str)
+                if bullet_match:
+                    indent = bullet_match.group(1)
+                    space = bullet_match.group(3)
+                    line_str = indent + chr(149) + space + line_str[bullet_match.end():]
+
+                # Regular line with potential **bold** text
+                parts = line_str.split("**")
+                for i, part in enumerate(parts):
+                    if i % 2 == 1:
+                        pdf.set_font("helvetica", "B", 10)
+                    else:
+                        pdf.set_font("helvetica", "", 10)
+                    pdf.write(5, part)
+                pdf.ln(5)
+                
+        # If we reach the end of the loop and are still in a table, render it
+        if in_table:
+            render_pdf_table(pdf, table_rows)
+            
         pdf.ln(5)
         
     # Get app directory path

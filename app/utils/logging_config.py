@@ -26,8 +26,8 @@ def setup_logging(default_level=logging.INFO):
         
     formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     
-    # Console Handler (Stdout)
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Console Handler (Stderr)
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
     

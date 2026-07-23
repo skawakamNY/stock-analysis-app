@@ -54,7 +54,7 @@ IMPORTANT: The current date and time is {current_date_str} {current_time_str} (C
 Company: {state["company_name"]}
 Ticker: {state["ticker"]}
 
-You MUST query the corporate documents database (using the `doc_rag_search` tool) to retrieve and load details across these specific horizons:
+You MUST query the Document Searcher Agent MCP service (using the `doc_rag_search` tool) to retrieve details across these specific horizons:
 1. Last {NUM_YEARS_TO_LOAD_10K} years of 10-K filings for long-term structural and strategic business model analysis.
 2. Last {NUM_QUARTERS_TO_LOAD_10Q} quarters of 10-Q filings for mid-term financial and operational trends.
 3. Last {NUM_DAYS_TO_LOAD_8K} days of 8-K filings for immediate material events, announcements, or corporate changes.

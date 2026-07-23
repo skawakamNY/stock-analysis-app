@@ -160,7 +160,7 @@ app.add_middleware(
 async def startup_event():
     """Reset any stale in_progress registry markers left by a previous crashed run."""
     try:
-        from tools.corporate_documents_search import IngestionRegistry
+        from mcp_server import IngestionRegistry
         IngestionRegistry().reset_stale_in_progress()
         logger.info("Startup: Cleared any stale in_progress ingestion markers.")
     except Exception as e:
@@ -234,13 +234,6 @@ async def analyze_stock(request: Request):
                     # Small sleep to prevent network race condition in UI updates
                     await asyncio.sleep(0.1)
             
-            # Save all contents to PDF
-            try:
-                pdf_path = await asyncio.to_thread(save_reports_to_pdf, ticker, company_name, final_state)
-                logger.info(f"Consensus report successfully saved to PDF: {pdf_path}")
-            except Exception as pdf_err:
-                logger.error(f"Failed to generate PDF report: {pdf_err}")
-                
             # Send completion signal
             yield f"data: {json.dumps({'status': 'completed'})}\n\n"
         except Exception as e:
@@ -302,13 +295,13 @@ async def startup_event():
 # Chroma Explorer API Endpoints
 @app.get("/api/registry")
 def get_registry():
-    from tools.corporate_documents_search import IngestionRegistry
+    from mcp_server import IngestionRegistry
     registry = IngestionRegistry()
     return registry.load_registry()
 
 @app.get("/api/inspect")
 def inspect_collection():
-    from tools.corporate_documents_search import HybridSearcher
+    from mcp_server import HybridSearcher
     try:
         searcher_inspect = HybridSearcher(persist_directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "database"))
         res = searcher_inspect.collection.get()
@@ -329,7 +322,7 @@ def inspect_collection():
 
 @app.post("/api/ingest")
 def run_ingest(payload: IngestRequest):
-    from tools.corporate_documents_search import HybridSearcher, ingest_all_corporate_data
+    from mcp_server import HybridSearcher, ingest_all_corporate_data
     ticker = payload.ticker.strip().upper()
     if not ticker:
         return {"error": "Ticker symbol is required"}, 400
@@ -343,7 +336,7 @@ def run_ingest(payload: IngestRequest):
 
 @app.post("/api/delete-ticker")
 def delete_ticker(payload: DeleteTickerRequest):
-    from tools.corporate_documents_search import HybridSearcher
+    from mcp_server import HybridSearcher
     ticker = payload.ticker.strip().upper()
     if not ticker:
         return {"error": "Ticker symbol is required"}, 400
@@ -357,7 +350,7 @@ def delete_ticker(payload: DeleteTickerRequest):
 
 @app.post("/api/query")
 def run_query(payload: QueryRequest):
-    from tools.corporate_documents_search import HybridSearcher, CrossEncoderReranker
+    from mcp_server import HybridSearcher, CrossEncoderReranker
     query = payload.query.strip()
     ticker_filter = payload.ticker.strip().upper()
     form_filter = payload.form_type.strip()
@@ -410,7 +403,7 @@ def run_query(payload: QueryRequest):
 
 @app.post("/api/eval")
 def run_eval(payload: EvalRequest):
-    from tools.corporate_documents_search import HybridSearcher, RetrievalEvaluator
+    from mcp_server import HybridSearcher, RetrievalEvaluator
     form_type = payload.form_type
     try:
         searcher_eval = HybridSearcher(persist_directory=os.path.join(os.path.dirname(os.path.abspath(__file__)), "database"))

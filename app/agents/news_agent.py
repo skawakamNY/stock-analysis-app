@@ -27,7 +27,7 @@ Synthesize this information into a consolidated news and sentiment report. Highl
     # Store news chunks in Chroma Vector Database
     try:
         import os
-        from tools.corporate_documents_search import HybridSearcher
+        from mcp_server import HybridSearcher
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         searcher = HybridSearcher(persist_directory=os.path.join(app_dir, "database"))
         

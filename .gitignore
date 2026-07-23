@@ -91,7 +91,7 @@ app/database/56e7f799-*/
 
 # Generated/cached documents (uploaded at runtime)
 app/documents/
-
+app/markdown/
 # Transcript cache files (runtime-generated)
 transcripts_cache_*.json
 
@@ -138,3 +138,5 @@ $RECYCLE.BIN/
 # =============================================================================
 # Ignore local override files but keep base compose
 docker-compose.override.yml
+
+app/mcp_server/database/*
